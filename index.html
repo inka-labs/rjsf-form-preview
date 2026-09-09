@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RJSF Form Preview</title>
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --panel: #ffffff;
+    --border: #e2e2e6;
+    --text: #1c1c1f;
+    --muted: #6b6b73;
+    --accent: #2f6fed;
+    --accent-soft: #eaf1ff;
+    --danger: #d0402a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181c;
+      --panel: #202127;
+      --border: #34353c;
+      --text: #ececec;
+      --muted: #9a9aa2;
+      --accent: #6f9fff;
+      --accent-soft: #22304f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h1 {
+    font-size: 15px;
+    margin: 0;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .topbar .status {
+    color: var(--muted);
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+  button, .filebtn {
+    font: inherit;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  button:hover { filter: brightness(1.05); }
+  input[type=file] { display: none; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 0;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .dropzone {
+    margin: 60px auto;
+    max-width: 560px;
+    padding: 40px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .dropzone.drag { border-color: var(--accent); color: var(--accent); }
+  .dropzone h2 { color: var(--text); font-size: 16px; margin: 0 0 8px; }
+  .dropzone code {
+    font-family: var(--mono);
+    background: var(--accent-soft);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  #formCol { padding: 20px 24px 80px; min-width: 0; }
+  #jsonCol {
+    position: sticky;
+    top: 49px;
+    height: calc(100vh - 49px);
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+  }
+  #jsonCol .jsonhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  #jsonCol .jsonhead span { font-weight: 600; font-size: 13px; }
+  #jsonOut {
+    margin: 0;
+    padding: 14px;
+    overflow: auto;
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 12px;
+    white-space: pre;
+  }
+
+  .task-section {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .task-section.task-group { border-color: var(--accent); }
+  .task-header { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .task-header h2 { margin: 0; font-size: 15px; }
+  .task-desc { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .section-body { padding: 14px 18px; display: flex; flex-direction: column; gap: 14px; }
+
+  .group {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: color-mix(in srgb, var(--panel) 96%, var(--text) 4%);
+  }
+  .group-title { font-weight: 600; font-size: 13px; }
+  .group-desc { margin: -4px 0 0; color: var(--muted); font-size: 12px; }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field-label { font-size: 12.5px; font-weight: 600; }
+  .field-desc { margin: 0; color: var(--muted); font-size: 12px; }
+  .req { color: var(--danger); }
+
+  input[type=text], input[type=number], input[type=datetime-local], select {
+    font: inherit;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    max-width: 420px;
+  }
+  input[type=checkbox] { width: 16px; height: 16px; }
+
+  details.advanced {
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  details.advanced summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  details.advanced[open] summary { margin-bottom: 10px; }
+  details.advanced > .field, details.advanced > .group, details.advanced > .union-field {
+    margin-top: 10px;
+  }
+
+  .union-select { margin-bottom: 8px; }
+  .union-body { display: flex; flex-direction: column; gap: 12px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>RJSF Form Preview</h1>
+    <span class="status" id="statusEl">No schema loaded yet.</span>
+    <label class="filebtn" for="fileInput">Choose rjsf.json&hellip;</label>
+    <input type="file" id="fileInput" accept="application/json,.json" />
+    <button id="resetBtn" hidden>Reset values</button>
+  </div>
+
+  <div class="layout">
+    <div id="formCol">
+      <div class="dropzone" id="dropZone">
+        <h2>Drop an <code>rjsf.json</code> file here</h2>
+        <p>or use &ldquo;Choose rjsf.json&hellip;&rdquo; above.<br/>
+        This reads any react-jsonschema-form style schema (with <code>$defs</code>, <code>$ref</code>,
+        <code>oneOf</code>/<code>anyOf</code> variants, and <code>uiSchema</code>) and renders the
+        expected inputs &mdash; field types, defaults, required markers, and descriptions &mdash; as an
+        editable form. Nothing is uploaded anywhere; it all runs in this page.</p>
+      </div>
+    </div>
+    <div id="jsonCol" hidden>
+      <div class="jsonhead">
+        <span>Current values (JSON)</span>
+        <button id="copyBtn">Copy</button>
+      </div>
+      <pre id="jsonOut"></pre>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  let schemaRoot = null;
+  let state = {};
+
+  const dropZone = document.getElementById('dropZone');
+  const formCol = document.getElementById('formCol');
+  const jsonCol = document.getElementById('jsonCol');
+  const jsonOut = document.getElementById('jsonOut');
+  const statusEl = document.getElementById('statusEl');
+  const fileInput = document.getElementById('fileInput');
+  const resetBtn = document.getElementById('resetBtn');
+  const copyBtn = document.getElementById('copyBtn');
+
+  let formRoot = null; // container appended into formCol once a schema loads
+
+  // ---------- generic dom helper ----------
+  function el(tag, attrs = {}, children = []) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === undefined || v === null) continue;
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k.startsWith('data-')) e.setAttribute(k, v);
+      else if (k in e) e[k] = v;
+      else e.setAttribute(k, v);
+    }
+    for (const c of [].concat(children)) {
+      if (c === undefined || c === null) continue;
+      e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    }
+    return e;
+  }
+
+  function humanize(key) {
+    return String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function fieldLabel(key, schema) {
+    const t = (schema && schema.title || '').trim();
+    return t.length ? t : humanize(key);
+  }
+
+  // ---------- schema resolution ($ref / allOf) ----------
+  function resolveRef(ref) {
+    const parts = ref.replace(/^#\//, '').split('/');
+    let node = schemaRoot;
+    for (const p of parts) node = node && node[p];
+    return node || {};
+  }
+
+  function resolveSchema(schema) {
+    if (!schema || typeof schema !== 'object') return schema || {};
+    if (schema.$ref) {
+      const resolved = resolveSchema(resolveRef(schema.$ref));
+      const { $ref, ...siblings } = schema;
+      return { ...resolved, ...siblings };
+    }
+    if (Array.isArray(schema.allOf) && schema.allOf.length) {
+      let merged = {};
+      for (const sub of schema.allOf) merged = { ...merged, ...resolveSchema(sub) };
+      const { allOf, ...siblings } = schema;
+      return { ...merged, ...siblings };
+    }
+    return schema;
+  }
+
+  // ---------- state helpers ----------
+  function getPath(obj, path) {
+    return path.reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  }
+  function setPath(obj, path, value) {
+    let node = obj;
+    for (let i = 0; i < path.length - 1; i++) {
+      const k = path[i];
+      if (typeof node[k] !== 'object' || node[k] === null) node[k] = {};
+      node = node[k];
+    }
+    node[path[path.length - 1]] = value;
+  }
+
+  function matchVariant(variants, currentValue) {
+    if (!currentValue) return 0;
+    for (let i = 0; i < variants.length; i++) {
+      const props = variants[i].properties || {};
+      for (const [k, v] of Object.entries(props)) {
+        if (v && v.const !== undefined && currentValue[k] === v.const) return i;
+      }
+    }
+    for (let i = 0; i < variants.length; i++) {
+      const props = variants[i].properties || {};
+      for (const [k, v] of Object.entries(props)) {
+        if (v && Array.isArray(v.enum) && currentValue[k] !== undefined && v.enum.includes(currentValue[k])) return i;
+      }
+    }
+    return 0;
+  }
+
+  function collectDefaults(rawSchema) {
+    const schema = resolveSchema(rawSchema);
+    if (schema.oneOf || schema.anyOf) {
+      const variants = (schema.oneOf || schema.anyOf).map(resolveSchema);
+      const base = schema.default || {};
+      const idx = matchVariant(variants, base);
+      const variantDefaults = collectDefaults(variants[idx]) || {};
+      return { ...variantDefaults, ...base };
+    }
+    if (schema.type === 'object' || schema.properties) {
+      const base = (schema.default && typeof schema.default === 'object') ? { ...schema.default } : {};
+      for (const [k, v] of Object.entries(schema.properties || {})) {
+        if (base[k] === undefined) base[k] = collectDefaults(v);
+      }
+      return base;
+    }
+    return schema.default;
+  }
+
+  // ---------- leaf field builders ----------
+  function makeText(schema, path) {
+    const val = getPath(state, path);
+    const input = el('input', { type: 'text', 'data-path': JSON.stringify(path), 'data-kind': 'string' });
+    input.value = (val !== undefined && val !== null) ? val : '';
+    if (schema.default !== undefined && schema.default !== null) input.placeholder = String(schema.default);
+    return input;
+  }
+  function makeNumber(schema, path, kind) {
+    const val = getPath(state, path);
+    const input = el('input', { type: 'number', 'data-path': JSON.stringify(path), 'data-kind': kind });
+    if (schema.minimum !== undefined) input.min = schema.minimum;
+    if (schema.exclusiveMinimum !== undefined) input.min = schema.exclusiveMinimum;
+    if (schema.maximum !== undefined) input.max = schema.maximum;
+    if (schema.exclusiveMaximum !== undefined) input.max = schema.exclusiveMaximum;
+    input.step = kind === 'integer' ? '1' : 'any';
+    input.value = (val !== undefined && val !== null) ? val : '';
+    return input;
+  }
+  function makeCheckbox(schema, path) {
+    const val = getPath(state, path);
+    const input = el('input', { type: 'checkbox', 'data-path': JSON.stringify(path), 'data-kind': 'boolean' });
+    input.checked = !!val;
+    return input;
+  }
+  function toLocalInputValue(iso) {
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch (e) { return iso; }
+  }
+  function makeDateTime(schema, path) {
+    const val = getPath(state, path);
+    const input = el('input', { type: 'datetime-local', 'data-path': JSON.stringify(path), 'data-kind': 'datetime' });
+    if (val) input.value = toLocalInputValue(val);
+    return input;
+  }
+  function makeSelect(schema, path) {
+    const val = getPath(state, path);
+    const select = el('select', { 'data-path': JSON.stringify(path), 'data-kind': 'enum' });
+    (schema.enum || []).forEach(optVal => {
+      const opt = el('option', { value: String(optVal), text: String(optVal) });
+      if (optVal === val || (val === undefined && optVal === schema.default)) opt.selected = true;
+      select.appendChild(opt);
+    });
+    return select;
+  }
+  function makeArrayText(schema, path) {
+    const val = getPath(state, path);
+    const input = el('input', { type: 'text', 'data-path': JSON.stringify(path), 'data-kind': 'array' });
+    input.value = Array.isArray(val) ? val.join(', ') : '';
+    input.placeholder = 'comma-separated values';
+    return input;
+  }
+
+  function fieldWrapper(labelText, description, required, controlEl, extraClass = '') {
+    const wrap = el('div', { class: 'field ' + extraClass });
+    const labelEl = el('label', { class: 'field-label' }, labelText);
+    if (required) labelEl.appendChild(el('span', { class: 'req', text: ' *' }));
+    wrap.appendChild(labelEl);
+    if (description) wrap.appendChild(el('p', { class: 'field-desc', text: description }));
+    wrap.appendChild(controlEl);
+    return wrap;
+  }
+
+  // ---------- object / union rendering ----------
+  function renderObject(rawSchema, path, uiNode, opts = {}) {
+    const schema = resolveSchema(rawSchema);
+    const props = schema.properties || {};
+    const required = new Set(schema.required || []);
+    const order = (uiNode && uiNode['ui:order']) || Object.keys(props);
+    const container = el('div', { class: opts.topLevel ? 'section-body' : 'group' });
+
+    if (!opts.topLevel) {
+      const legendText = fieldLabel(path[path.length - 1], schema).trim();
+      if (legendText) {
+        const legend = el('div', { class: 'group-title' }, legendText);
+        if (opts.required) legend.appendChild(el('span', { class: 'req', text: ' *' }));
+        container.appendChild(legend);
+      }
+      if (schema.description) container.appendChild(el('p', { class: 'group-desc', text: schema.description }));
+    }
+
+    const mainFields = [];
+    const advancedFields = [];
+    for (const key of order) {
+      const childRaw = props[key];
+      if (!childRaw) continue;
+      const childSchema = resolveSchema(childRaw);
+      const childPath = path.concat(key);
+
+      if (childSchema.const !== undefined) {
+        setPath(state, childPath, childSchema.const);
+        continue;
+      }
+
+      const childUi = (uiNode && uiNode[key]) || {};
+      const node = renderNode(childRaw, childPath, childUi, required.has(key));
+      if (childSchema['ecoscope:advanced']) advancedFields.push(node);
+      else mainFields.push(node);
+    }
+    mainFields.forEach(n => container.appendChild(n));
+    if (advancedFields.length) {
+      const details = el('details', { class: 'advanced' });
+      details.appendChild(el('summary', { text: `Advanced options (${advancedFields.length})` }));
+      advancedFields.forEach(n => details.appendChild(n));
+      container.appendChild(details);
+    }
+    return container;
+  }
+
+  function renderUnion(schema, path, uiNode, label, required) {
+    const variants = (schema.oneOf || schema.anyOf).map(resolveSchema);
+    const current = getPath(state, path) || {};
+    const selectedIdx = matchVariant(variants, current);
+
+    const wrap = el('div', { class: 'field union-field' });
+    const labelEl = el('label', { class: 'field-label' }, label);
+    if (required) labelEl.appendChild(el('span', { class: 'req', text: ' *' }));
+    wrap.appendChild(labelEl);
+    if (schema.description) wrap.appendChild(el('p', { class: 'field-desc', text: schema.description }));
+
+    const select = el('select', { class: 'union-select' });
+    variants.forEach((v, i) => {
+      const opt = el('option', { value: String(i), text: v.title || `Option ${i + 1}` });
+      if (i === selectedIdx) opt.selected = true;
+      select.appendChild(opt);
+    });
+    wrap.appendChild(select);
+
+    const subContainer = el('div', { class: 'union-body' });
+    wrap.appendChild(subContainer);
+
+    function renderVariant(idx) {
+      subContainer.innerHTML = '';
+      const variantSchema = variants[idx];
+      const existing = getPath(state, path) || {};
+      const defaults = collectDefaults(variantSchema) || {};
+      setPath(state, path, { ...defaults, ...existing });
+      subContainer.appendChild(renderObject(variantSchema, path, {}, { topLevel: true }));
+      refreshJsonView();
+    }
+
+    select.addEventListener('change', () => renderVariant(Number(select.value)));
+    renderVariant(selectedIdx);
+    return wrap;
+  }
+
+  function renderNode(rawSchema, path, uiNode, required) {
+    const schema = resolveSchema(rawSchema);
+    const key = path[path.length - 1];
+    const label = fieldLabel(key, schema);
+
+    if (schema.oneOf || schema.anyOf) return renderUnion(schema, path, uiNode, label, required);
+    if (schema.type === 'object' || schema.properties) return renderObject(schema, path, uiNode, { required });
+
+    let control;
+    if (Array.isArray(schema.enum)) control = makeSelect(schema, path);
+    else if (schema.type === 'boolean') control = makeCheckbox(schema, path);
+    else if (schema.type === 'string' && schema.format === 'date-time') control = makeDateTime(schema, path);
+    else if (schema.type === 'number' || schema.type === 'integer') control = makeNumber(schema, path, schema.type);
+    else if (schema.type === 'array') control = makeArrayText(schema, path);
+    else control = makeText(schema, path);
+
+    return fieldWrapper(label, schema.description, required, control);
+  }
+
+  // ---------- top level ----------
+  function loadSchema(json) {
+    schemaRoot = json;
+    state = {};
+    for (const [key, sub] of Object.entries(json.properties || {})) {
+      state[key] = collectDefaults(sub);
+    }
+    renderForm();
+  }
+
+  function renderForm() {
+    formRoot.innerHTML = '';
+    const topOrder = (schemaRoot.uiSchema && schemaRoot.uiSchema['ui:order']) || Object.keys(schemaRoot.properties || {});
+    topOrder.forEach(key => {
+      const sub = schemaRoot.properties[key];
+      if (!sub) return;
+      const resolved = resolveSchema(sub);
+      const section = el('section', { class: 'task-section' + (resolved['ecoscope:task_group'] ? ' task-group' : '') });
+      const header = el('div', { class: 'task-header' });
+      header.appendChild(el('h2', {}, fieldLabel(key, resolved)));
+      if (resolved.description) header.appendChild(el('p', { class: 'task-desc', text: resolved.description }));
+      section.appendChild(header);
+      const uiNode = (schemaRoot.uiSchema && schemaRoot.uiSchema[key]) || {};
+      section.appendChild(renderObject(resolved, [key], uiNode, { topLevel: true }));
+      formRoot.appendChild(section);
+    });
+    refreshJsonView();
+  }
+
+  function refreshJsonView() {
+    jsonOut.textContent = JSON.stringify(state, null, 2);
+  }
+
+  function handleFieldEvent(e) {
+    const t = e.target;
+    const pathAttr = t.getAttribute && t.getAttribute('data-path');
+    if (!pathAttr) return;
+    const path = JSON.parse(pathAttr);
+    const kind = t.getAttribute('data-kind');
+    let value;
+    switch (kind) {
+      case 'boolean': value = t.checked; break;
+      case 'number': value = t.value === '' ? undefined : Number(t.value); break;
+      case 'integer': value = t.value === '' ? undefined : parseInt(t.value, 10); break;
+      case 'datetime': value = t.value ? new Date(t.value).toISOString() : undefined; break;
+      case 'array': value = t.value.split(',').map(s => s.trim()).filter(s => s !== '').map(s => (isNaN(Number(s)) ? s : Number(s))); break;
+      default: value = t.value;
+    }
+    setPath(state, path, value);
+    refreshJsonView();
+  }
+
+  // ---------- file loading ----------
+  function readFile(f) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result);
+        dropZone.hidden = true;
+        if (!formRoot) {
+          formRoot = el('div', { id: 'formRoot' });
+          formRoot.addEventListener('input', handleFieldEvent);
+          formRoot.addEventListener('change', handleFieldEvent);
+          formCol.appendChild(formRoot);
+        }
+        loadSchema(json);
+        jsonCol.hidden = false;
+        resetBtn.hidden = false;
+        statusEl.textContent = `Loaded ${f.name}`;
+      } catch (err) {
+        statusEl.textContent = 'Error parsing JSON: ' + err.message;
+      }
+    };
+    reader.readAsText(f);
+  }
+
+  fileInput.addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) readFile(f);
+  });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    if (f) readFile(f);
+  });
+  resetBtn.addEventListener('click', () => {
+    if (schemaRoot) loadSchema(schemaRoot);
+  });
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(jsonOut.textContent).then(() => {
+      const old = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => (copyBtn.textContent = old), 1200);
+    });
+  });
+})();
+</script>
+</body>
+</html>
